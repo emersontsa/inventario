@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventário - Contagem</title>
+
+<!-- SheetJS LOCAL - sem CDN, funciona offline -->
+<script src="xlsx.full.min.js"></script>
+
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0; padding: 0;
+    background: #f0f2f5;
+    color: #1a1a1a;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .tela { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+  h1 { font-size: 20px; margin: 0 0 16px; }
+  h2 { font-size: 16px; margin: 0 0 8px; color: #555; }
+
+  button {
+    font-size: 18px;
+    padding: 16px 20px;
+    border: none;
+    border-radius: 10px;
+    background: #0066cc;
+    color: white;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+    font-weight: 600;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  button:active { background: #004d99; }
+  button.secundario { background: #6c757d; }
+  button.sucesso { background: #28a745; }
+  button.adicionar { background: #17a2b8; }
+
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin-bottom: 16px;
+  }
+
+  .material {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    line-height: 1.3;
+    color: #1a1a1a;
+  }
+
+  .bloco-info {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+
+  .linha-info {
+    font-size: 15px;
+    color: #1a1a1a;
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+  .linha-info:last-child { margin-bottom: 0; }
+
+  .linha-info .rotulo {
+    color: #888;
+    font-weight: 500;
+    margin-right: 4px;
+  }
+  .linha-info .valor {
+    font-weight: 700;
+    color: #1a1a1a;
+  }
+
+  .lote-validade {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: baseline;
+  }
+  .lote-validade > span {
+    display: inline-block;
+  }
+
+  .divisor {
+    height: 1px;
+    background: #e0e0e0;
+    margin: 12px 0;
+  }
+
+  .campo-editavel {
+    background: #fff8e1;
+    border: 1px solid #ffc107;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 10px;
+  }
+  .campo-editavel label {
+    display: block;
+    font-size: 12px;
+    color: #856404;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+  .campo-editavel input {
+    width: 100%;
+    font-size: 16px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: white;
+    font-weight: 600;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .campo-editavel input:focus {
+    outline: none;
+    border-color: #17a2b8;
+  }
+
+  .campo-contagem {
+    margin-bottom: 14px;
+  }
+  .campo-contagem label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .campo-contagem input {
+    font-size: 32px;
+    padding: 16px;
+    width: 100%;
+    text-align: center;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    font-weight: 700;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .campo-contagem input:focus {
+    outline: none;
+    border-color: #0066cc;
+  }
+  .campo-contagem input.preenchido {
+    border-color: #28a745;
+    background: #f0fff4;
+  }
+
+  .progresso {
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .progresso > div {
+    height: 100%;
+    background: #28a745;
+    transition: width 0.3s;
+  }
+
+  .aviso {
+    background: #fff3cd;
+    color: #856404;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-top: 10px;
+  }
+
+  .info-gravacao {
+    background: #d1ecf1;
+    color: #0c5460;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 12px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .sucesso-box {
+    background: #d4edda;
+    color: #155724;
+    padding: 14px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .oculto { display: none; }
+
+  .lista-concluidos {
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 14px;
+    color: #555;
+  }
+  .lista-concluidos div {
+    padding: 6px 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .badge-novo {
+    display: inline-block;
+    background: #17a2b8;
+    color: white;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  .titulo-novo {
+    font-size: 20px;
+    font-weight: 700;
+    color: #17a2b8;
+    margin-bottom: 16px;
+  }
+
+  .debug-info {
+    background: #e7f3ff;
+    color: #004085;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    margin-bottom: 12px;
+    font-family: monospace;
+  }
+
+  .separador-resumo {
+    height: 1px;
+    background: #ddd;
+    margin: 16px 0;
+  }
+
+  .subtitulo-resumo {
+    font-size: 14px;
+    font-weight: 700;
+    color: #17a2b8;
+    margin: 12px 0 6px;
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<!-- TELA 1: ABRIR PLANILHA -->
+<div id="tela-inicial" class="tela">
+  <div class="card">
+    <h1>📋 Inventário</h1>
+    <p>Selecione a planilha Excel da sua dupla para começar a contagem.</p>
+
+    <div class="info-gravacao">
+      ℹ️ Ao final, será gerada uma cópia atualizada da planilha.
+    </div>
+
+    <button onclick="document.getElementById('input-arquivo').click()">
+      Abrir planilha
+    </button>
+    <input type="file" id="input-arquivo" accept=".xlsx,.xls" class="oculto" style="display:none">
+    <div id="msg-inicial" class="aviso oculto"></div>
+  </div>
+</div>
+
+<!-- TELA 2: CONTAGEM -->
+<div id="tela-contagem" class="tela oculto">
+  <div class="debug-info" id="debug-info"></div>
+
+  <div class="progresso"><div id="barra-progresso"></div></div>
+  <div style="display:flex; justify-content:space-between; font-size:15px; color:#666; margin-bottom:12px;">
+    <span id="contador-topo"></span>
+    <span>✅ <strong id="num-contados">0</strong></span>
+  </div>
+
+  <div class="card" id="card-item">
+    <!-- MODO NORMAL -->
+    <div id="bloco-item">
+      <div class="material" id="item-material"></div>
+
+      <div class="bloco-info">
+        <div class="linha-info">
+          <span class="rotulo">Endereçamento:</span>
+          <span class="valor" id="item-enderecamento"></span>
+        </div>
+        <div class="linha-info">
+          <span class="rotulo">Código AGHU:</span>
+          <span class="valor" id="item-codigo"></span>
+        </div>
+        <div class="linha-info">
+          <span class="rotulo">Apresentação:</span>
+          <span class="valor" id="item-apresentacao"></span>
+        </div>
+
+        <div class="divisor"></div>
+
+        <div class="linha-info lote-validade">
+          <span>
+            <span class="rotulo">Lote:</span>
+            <span class="valor" id="item-lote"></span>
+          </span>
+          <span>
+            <span class="rotulo">Validade:</span>
+            <span class="valor" id="item-validade"></span>
+          </span>
+        </div>
+
+        <div class="divisor"></div>
+
+        <div class="linha-info">
+          <span class="rotulo">Marca:</span>
+          <span class="valor" id="item-marca"></span>
+        </div>
+      </div>
+
+      <div id="campos-contagem"></div>
+
+      <button class="sucesso" onclick="salvarItem()">Salvar e próximo →</button>
+      <button class="secundario" onclick="pularItem()">Pular</button>
+      <button class="adicionar" onclick="entrarModoNovo()">
+        ➕ Adicionar item com mesmo material (outro lote/validade)
+      </button>
+    </div>
+
+    <!-- MODO NOVO ITEM -->
+    <div id="bloco-novo" class="oculto">
+      <div class="titulo-novo">➕ Adicionar lote/validade diferente</div>
+
+      <p style="color:#666; font-size:14px; margin-top:0;">
+        O item original <strong>permanece intacto</strong>. Preencha abaixo os dados do novo
+        lote/validade. Material e demais características serão copiados do item atual.
+      </p>
+
+      <div class="bloco-info">
+        <div class="linha-info">
+          <span class="rotulo">Endereçamento:</span>
+          <span class="valor" id="novo-enderecamento"></span>
+        </div>
+        <div class="linha-info">
+          <span class="rotulo">Código AGHU:</span>
+          <span class="valor" id="novo-codigo"></span>
+        </div>
+        <div class="linha-info">
+          <span class="rotulo">Apresentação:</span>
+          <span class="valor" id="novo-apresentacao"></span>
+        </div>
+        <div class="divisor"></div>
+        <div class="linha-info">
+          <span class="rotulo">Marca:</span>
+          <span class="valor" id="novo-marca"></span>
+        </div>
+        <div class="linha-info">
+          <span class="rotulo">Material:</span>
+          <span class="valor" id="novo-material"></span>
+        </div>
+      </div>
+
+      <div class="campo-editavel">
+        <label>Lote *</label>
+        <input type="text" id="novo-lote" placeholder="Digite o lote">
+      </div>
+
+      <div class="campo-editavel">
+        <label>Validade</label>
+        <input type="date" id="novo-validade">
+      </div>
+
+      <div id="campos-contagem-novo"></div>
+
+      <button class="adicionar" onclick="salvarNovoItem()">
+        ✓ Adicionar este item
+      </button>
+      <button class="secundario" onclick="sairModoNovo()">
+        ← Cancelar
+      </button>
+    </div>
+  </div>
+
+  <button class="secundario" onclick="finalizar()">
+    Finalizar e gerar planilha
+  </button>
+</div>
+
+<!-- TELA 3: FINAL -->
+<div id="tela-final" class="tela oculto">
+  <div class="card">
+    <div class="sucesso-box">✅ Inventário concluído!</div>
+
+    <h2>Resumo</h2>
+
+    <p>Itens da planilha contados: <strong id="resumo-contados"></strong></p>
+    <p>Itens da planilha pulados: <strong id="resumo-pulados"></strong></p>
+
+    <div class="separador-resumo"></div>
+
+    <div class="subtitulo-resumo">Itens adicionados (lotes/validades extras)</div>
+    <p>Total de itens adicionados: <strong id="resumo-novos"></strong></p>
+
+    <h2 style="margin-top:20px;">Itens contados da planilha:</h2>
+    <div class="lista-concluidos" id="lista-concluidos"></div>
+
+    <div class="subtitulo-resumo" style="margin-top:20px;">Itens adicionados:</div>
+    <div class="lista-concluidos" id="lista-novos"></div>
+
+    <button class="sucesso" onclick="baixarPlanilha()">
+      ⬇️ Baixar planilha atualizada
+    </button>
+    <button class="secundario" onclick="location.reload()">
+      Nova contagem
+    </button>
+  </div>
+</div>
+
+<script>
+// ============ VERIFICAÇÃO DA BIBLIOTECA ============
+if (typeof XLSX === "undefined") {
+  document.body.innerHTML = `
+    <div style="padding: 40px; text-align: center; font-family: sans-serif;">
+      <h1 style="color: #d9534f;">⚠️ Erro</h1>
+      <p>A biblioteca <strong>xlsx.full.min.js</strong> não foi encontrada.</p>
+      <p>Certifique-se de que o arquivo <code>xlsx.full.min.js</code> está na mesma pasta
+      deste HTML.</p>
+    </div>
+  `;
+}
+
+// ============ ESTADO ============
+let workbook = null;
+let nomeArquivo = "inventario.xlsx";
+let itens = [];
+let itensOriginais = [];
+let itensNovos = [];
+let indiceAtual = 0;
+let colunasContagem = [];
+let ultimaLinhaOriginal = 1;
+let emModoNovo = false;
+
+// ============ ABRIR PLANILHA ============
+document.getElementById('input-arquivo').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  nomeArquivo = file.name;
+
+  try {
+    const data = await file.arrayBuffer();
+    workbook = XLSX.read(data);
+
+    const nomeAba = workbook.SheetNames[0];
+    const aba = workbook.Sheets[nomeAba];
+    const linhas = XLSX.utils.sheet_to_json(aba, { header: 1, defval: "" });
+
+    if (linhas.length < 2) {
+      mostrarAviso("A planilha está vazia ou não tem dados além do cabeçalho.");
+      return;
+    }
+
+    const cabecalho = linhas[0].map(c => String(c).trim());
+    const acharColuna = (nomes) =>
+      cabecalho.findIndex(c => nomes.some(n => c.toLowerCase() === n.toLowerCase()));
+
+    const colItem         = acharColuna(["item"]);
+    const colMaterial     = acharColuna(["material"]);
+    const colCodigo       = acharColuna(["código aghu", "codigo aghu"]);
+    const colApresentacao = acharColuna(["apresentação", "apresentacao"]);
+    const colEndereco     = acharColuna(["endereçamento", "enderecamento"]);
+    const colLote         = acharColuna(["lote"]);
+    const colValidade     = acharColuna(["validade"]);
+    const colMarca        = acharColuna(["marca"]);
+
+    colunasContagem = [];
+    cabecalho.forEach((c, idx) => {
+      const match = c.match(/^contagem\s*(\d+)$/i);
+      if (match) {
+        colunasContagem.push({
+          indice: idx,
+          nome: `Contagem ${match[1]}`
+        });
+      }
+    });
+
+    colunasContagem.sort((a, b) => {
+      const na = parseInt(a.nome.match(/\d+/)[0]);
+      const nb = parseInt(b.nome.match(/\d+/)[0]);
+      return na - nb;
+    });
+
+    if (colunasContagem.length === 0) {
+      mostrarAviso("Nenhuma coluna 'Contagem 1', 'Contagem 2' ou 'Contagem 3' encontrada.");
+      return;
+    }
+
+    itensOriginais = [];
+    ultimaLinhaOriginal = 1;
+
+    for (let i = 1; i < linhas.length; i++) {
+      const l = linhas[i];
+      if (l.every(c => c === "" || c === undefined || c === null)) continue;
+      if (!l[colMaterial] && !l[colItem]) continue;
+
+      ultimaLinhaOriginal = i + 1;
+
+      const contagens = {};
+      colunasContagem.forEach(cc => {
+        let v = l[cc.indice];
+        if (typeof v === "string") v = v.trim();
+        if (v === "" || v === undefined || v === null) {
+          contagens[cc.nome] = null;
+        } else {
+          const n = Number(v);
+          contagens[cc.nome] = isNaN(n) ? null : n;
+        }
+      });
+
+      itensOriginais.push({
+        linha: i + 1,
+        item: l[colItem] ?? "",
+        material: String(l[colMaterial] ?? ""),
+        codigo: String(l[colCodigo] ?? ""),
+        apresentacao: String(l[colApresentacao] ?? ""),
+        enderecamento: String(l[colEndereco] ?? ""),
+        lote: String(l[colLote] ?? ""),
+        validade: l[colValidade] ?? "",
+        marca: String(l[colMarca] ?? ""),
+        contagens,
+        pulado: false,
+        novo: false
+      });
+    }
+
+    if (itensOriginais.length === 0) {
+      mostrarAviso("Nenhum item válido encontrado na planilha.");
+      return;
+    }
+
+    itensNovos = [];
+    itens = [...itensOriginais];
+
+    let primeiroPendente = itensOriginais.findIndex(i => !itemCompleto(i));
+    indiceAtual = primeiroPendente === -1 ? 0 : primeiroPendente;
+
+    document.getElementById('tela-inicial').classList.add('oculto');
+    document.getElementById('tela-contagem').classList.remove('oculto');
+    renderizarItem();
+
+  } catch (err) {
+    mostrarAviso("Erro ao ler a planilha: " + err.message);
+  }
+});
+
+function mostrarAviso(msg) {
+  const el = document.getElementById('msg-inicial');
+  el.textContent = msg;
+  el.classList.remove('oculto');
+}
+
+// ============ HELPERS ============
+function itemCompleto(item) {
+  if (!colunasContagem.length) return false;
+  for (const cc of colunasContagem) {
+    const v = item.contagens[cc.nome];
+    if (v === null || v === undefined) return false;
+  }
+  return true;
+}
+
+function formatarData(valor) {
+  if (valor === "" || valor === null || valor === undefined) return "-";
+  if (typeof valor === "string") {
+    const d = new Date(valor);
+    if (!isNaN(d.getTime())) return d.toLocaleDateString("pt-BR");
+    return valor;
+  }
+  if (typeof valor === "number") {
+    const dataExcel = new Date((valor - 25569) * 86400 * 1000);
+    const dia = String(dataExcel.getUTCDate()).padStart(2, "0");
+    const mes = String(dataExcel.getUTCMonth() + 1).padStart(2, "0");
+    const ano = dataExcel.getUTCFullYear();
+    return `${dia}/${mes}/${ano}`;
+  }
+  return String(valor);
+}
+
+function dataParaExcel(isoDate) {
+  if (!isoDate) return "";
+  const d = new Date(isoDate + "T00:00:00Z");
+  return Math.floor(d.getTime() / 86400000) + 25569;
+}
+
+// ============ CAMPOS DE CONTAGEM ============
+function gerarCamposContagem(containerId, valores, prefixo) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+
+  colunasContagem.forEach((cc, i) => {
+    const div = document.createElement('div');
+    div.className = 'campo-contagem';
+
+    const label = document.createElement('label');
+    label.textContent = cc.nome + ":";
+    div.appendChild(label);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.inputMode = 'numeric';
+    input.min = '0';
+    input.dataset.contagem = cc.nome;
+    input.dataset.idx = i;
+    input.placeholder = '0';
+    input.id = prefixo + '-cont-' + i;
+
+    if (valores && valores[cc.nome] !== null && valores[cc.nome] !== undefined) {
+      input.value = valores[cc.nome];
+      input.classList.add('preenchido');
+    }
+
+    input.addEventListener('input', () => {
+      if (input.value.trim() !== "") input.classList.add('preenchido');
+      else input.classList.remove('preenchido');
+    });
+
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        const proximo = container.querySelector(`input[data-idx="${i + 1}"]`);
+        if (proximo) proximo.focus();
+        else if (prefixo === 'novo') salvarNovoItem();
+        else salvarItem();
+      }
+    });
+
+    div.appendChild(input);
+    container.appendChild(div);
+  });
+
+  const todosInputs = container.querySelectorAll('input');
+  let focado = false;
+  todosInputs.forEach(inp => {
+    if (!focado && inp.value.trim() === "") {
+      inp.focus();
+      focado = true;
+    }
+  });
+  if (!focado && todosInputs.length) todosInputs[0].focus();
+}
+
+// ============ RENDERIZAR ============
+function renderizarItem() {
+  emModoNovo = false;
+  document.getElementById('bloco-item').classList.remove('oculto');
+  document.getElementById('bloco-novo').classList.add('oculto');
+
+  const item = itens[indiceAtual];
+  if (!item) { finalizar(); return; }
+
+  const badge = item.novo ? ' <span class="badge-novo">NOVO</span>' : '';
+  document.getElementById('item-material').innerHTML =
+    (item.material || "(sem material)") + badge;
+
+  document.getElementById('item-enderecamento').textContent = item.enderecamento || "-";
+  document.getElementById('item-codigo').textContent = item.codigo || "-";
+  document.getElementById('item-apresentacao').textContent = item.apresentacao || "-";
+  document.getElementById('item-lote').textContent = item.lote || "-";
+  document.getElementById('item-validade').textContent = formatarData(item.validade);
+  document.getElementById('item-marca').textContent = item.marca || "-";
+
+  gerarCamposContagem('campos-contagem', item.contagens, 'item');
+  atualizarProgresso();
+}
+
+function atualizarProgresso() {
+  const totalOriginais = itensOriginais.length;
+  const completosOriginais = itensOriginais.filter(itemCompleto).length;
+
+  const itemAtual = itens[indiceAtual];
+  let posicaoTexto;
+  if (emModoNovo) {
+    posicaoTexto = "Adicionando novo lote/validade";
+  } else if (itemAtual && itemAtual.novo) {
+    posicaoTexto = `Item adicionado (fora da contagem)`;
+  } else {
+    const posOriginal = itensOriginais.indexOf(itemAtual);
+    posicaoTexto = `Item <strong>${posOriginal + 1}</strong> de <strong>${totalOriginais}</strong>`;
+  }
+
+  document.getElementById('contador-topo').innerHTML = posicaoTexto;
+  document.getElementById('num-contados').textContent = completosOriginais;
+  document.getElementById('barra-progresso').style.width =
+    (totalOriginais > 0 ? completosOriginais / totalOriginais * 100 : 0) + "%";
+
+  document.getElementById('debug-info').textContent =
+    `Colunas: ${colunasContagem.map(c => c.nome).join(', ')} | ` +
+    `Originais: ${itensOriginais.length} | ` +
+    `Completos: ${completosOriginais} | ` +
+    `Adicionados: ${itensNovos.length} | ` +
+    `Índice: ${indiceAtual}`;
+}
+
+// ============ SALVAR ITEM ============
+function salvarItem() {
+  const container = document.getElementById('campos-contagem');
+  const inputs = container.querySelectorAll('input');
+
+  if (!inputs.length) {
+    alert("Erro: campos de contagem não encontrados.");
+    return;
+  }
+
+  const valores = {};
+  let algumPreenchido = false;
+  let algumVazio = false;
+
+  inputs.forEach(inp => {
+    const nome = inp.dataset.contagem;
+    const v = inp.value.trim();
+    if (v === "") {
+      algumVazio = true;
+      valores[nome] = null;
+    } else {
+      const n = Number(v);
+      if (isNaN(n)) {
+        algumVazio = true;
+        valores[nome] = null;
+      } else {
+        algumPreenchido = true;
+        valores[nome] = n;
+      }
+    }
+  });
+
+  if (!algumPreenchido) {
+    alert("Preencha pelo menos uma contagem.");
+    return;
+  }
+
+  if (algumVazio) {
+    if (!confirm("Algumas contagens estão vazias. Salvar assim mesmo?")) return;
+  }
+
+  itens[indiceAtual].contagens = valores;
+  itens[indiceAtual].pulado = false;
+  proximoItem();
+}
+
+// ============ PULAR ITEM ============
+function pularItem() {
+  itens[indiceAtual].pulado = true;
+  proximoItem();
+}
+
+// ============ PRÓXIMO ITEM ============
+function proximoItem() {
+  for (let i = 0; i < itensOriginais.length; i++) {
+    if (!itemCompleto(itensOriginais[i])) {
+      indiceAtual = itens.indexOf(itensOriginais[i]);
+      renderizarItem();
+      return;
+    }
+  }
+  finalizar();
+}
+
+// ============ MODO NOVO ============
+function entrarModoNovo() {
+  const item = itens[indiceAtual];
+  if (!item) return;
+
+  emModoNovo = true;
+  document.getElementById('bloco-item').classList.add('oculto');
+  document.getElementById('bloco-novo').classList.remove('oculto');
+
+  document.getElementById('novo-material').textContent = item.material || "-";
+  document.getElementById('novo-codigo').textContent = item.codigo || "-";
+  document.getElementById('novo-apresentacao').textContent = item.apresentacao || "-";
+  document.getElementById('novo-enderecamento').textContent = item.enderecamento || "-";
+  document.getElementById('novo-marca').textContent = item.marca || "-";
+
+  document.getElementById('novo-lote').value = "";
+  document.getElementById('novo-validade').value = "";
+
+  gerarCamposContagem('campos-contagem-novo', {}, 'novo');
+  atualizarProgresso();
+}
+
+function sairModoNovo() {
+  renderizarItem();
+}
+
+function salvarNovoItem() {
+  const itemAtual = itens[indiceAtual];
+  if (!itemAtual) return;
+
+  const lote = document.getElementById('novo-lote').value.trim();
+  const validadeInput = document.getElementById('novo-validade').value;
+
+  if (!lote) {
+    alert("Preencha o campo Lote.");
+    document.getElementById('novo-lote').focus();
+    return;
+  }
+
+  const container = document.getElementById('campos-contagem-novo');
+  const inputs = container.querySelectorAll('input');
+  const contagens = {};
+  let algumPreenchido = false;
+
+  inputs.forEach(inp => {
+    const nome = inp.dataset.contagem;
+    const v = inp.value.trim();
+    if (v === "") {
+      contagens[nome] = null;
+    } else {
+      const n = Number(v);
+      if (!isNaN(n)) {
+        algumPreenchido = true;
+        contagens[nome] = n;
+      } else {
+        contagens[nome] = null;
+      }
+    }
+  });
+
+  if (!algumPreenchido) {
+    alert("Preencha pelo menos uma contagem.");
+    return;
+  }
+
+  const novoItem = {
+    linha: null,
+    item: "item novo",
+    material: itemAtual.material,
+    codigo: itemAtual.codigo,
+    apresentacao: itemAtual.apresentacao,
+    enderecamento: itemAtual.enderecamento,
+    marca: itemAtual.marca,
+    lote,
+    validade: validadeInput ? dataParaExcel(validadeInput) : "",
+    contagens,
+    pulado: false,
+    novo: true
+  };
+
+  itensNovos.push(novoItem);
+  itens.push(novoItem);
+
+  alert("Item novo adicionado com sucesso!");
+  renderizarItem();
+}
+
+// ============ FINALIZAR ============
+function finalizar() {
+  const contados = itensOriginais.filter(itemCompleto).length;
+  const pulados = itensOriginais.filter(i => i.pulado && !itemCompleto(i)).length;
+  const totalNovos = itensNovos.length;
+
+  document.getElementById('resumo-contados').textContent = contados;
+  document.getElementById('resumo-pulados').textContent = pulados;
+  document.getElementById('resumo-novos').textContent = totalNovos;
+
+  const listaOrig = document.getElementById('lista-concluidos');
+  listaOrig.innerHTML = itensOriginais
+    .filter(i => Object.values(i.contagens).some(v => v !== null))
+    .map(i => {
+      const ident = i.codigo || i.material;
+      const loteInfo = i.lote ? ` (Lote ${i.lote})` : '';
+      const contStr = colunasContagem.map(cc => {
+        const v = i.contagens[cc.nome];
+        return v !== null ? `${cc.nome}: ${v}` : null;
+      }).filter(Boolean).join(' | ');
+      return `<div>${ident} — ${i.material}${loteInfo}: <strong>${contStr}</strong></div>`;
+    })
+    .join("") || "<div><em>Nenhum item da planilha foi contado.</em></div>";
+
+  const listaNovos = document.getElementById('lista-novos');
+  listaNovos.innerHTML = itensNovos
+    .map(i => {
+      const ident = i.codigo || i.material;
+      const loteInfo = i.lote ? ` (Lote ${i.lote})` : '';
+      const contStr = colunasContagem.map(cc => {
+        const v = i.contagens[cc.nome];
+        return v !== null ? `${cc.nome}: ${v}` : null;
+      }).filter(Boolean).join(' | ');
+      return `<div>${ident} — ${i.material}${loteInfo}: <strong>${contStr}</strong></div>`;
+    })
+    .join("") || "<div><em>Nenhum item foi adicionado.</em></div>";
+
+  document.getElementById('tela-contagem').classList.add('oculto');
+  document.getElementById('tela-final').classList.remove('oculto');
+}
+
+// ============ BAIXAR PLANILHA ============
+function baixarPlanilha() {
+  const nomeAba = workbook.SheetNames[0];
+  const aba = workbook.Sheets[nomeAba];
+
+  itensOriginais.forEach(item => {
+    colunasContagem.forEach(cc => {
+      const endereco = XLSX.utils.encode_cell({
+        r: item.linha - 1,
+        c: cc.indice
+      });
+      const v = item.contagens[cc.nome];
+      if (v !== null && v !== undefined) {
+        aba[endereco] = { t: 'n', v };
+      } else {
+        delete aba[endereco];
+      }
+    });
+  });
+
+  let proximaLinha = ultimaLinhaOriginal + 1;
+
+  itensNovos.forEach(item => {
+    const r = proximaLinha - 1;
+    escreverCelula(aba, r, "item", "item novo");
+    escreverCelula(aba, r, "material", item.material);
+    escreverCelula(aba, r, "código aghu", item.codigo);
+    escreverCelula(aba, r, "apresentação", item.apresentacao);
+    escreverCelula(aba, r, "endereçamento", item.enderecamento);
+    escreverCelula(aba, r, "lote", item.lote);
+    escreverCelula(aba, r, "validade", item.validade, 'n');
+    escreverCelula(aba, r, "marca", item.marca);
+
+    colunasContagem.forEach(cc => {
+      const v = item.contagens[cc.nome];
+      if (v !== null && v !== undefined) {
+        const endereco = XLSX.utils.encode_cell({ r, c: cc.indice });
+        aba[endereco] = { t: 'n', v };
+      }
+    });
+
+    proximaLinha++;
+  });
+
+  const ultimaLinha = proximaLinha - 1;
+  const numColunas = Object.keys(aba).filter(k => k[0] !== '!').reduce((max, k) => {
+    const c = XLSX.utils.decode_cell(k).c;
+    return Math.max(max, c);
+  }, 0);
+  aba['!ref'] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: ultimaLinha - 1, c: numColunas }
+  });
+
+  XLSX.writeFile(workbook, nomeArquivo.replace(/\.xlsx?$/, '') + "_contado.xlsx");
+}
+
+function escreverCelula(aba, linhaZeroBased, nomeCabecalho, valor, tipo = 's') {
+  const cabecalho = XLSX.utils.sheet_to_json(aba, { header: 1 })[0] || [];
+  const col = cabecalho.findIndex(c =>
+    String(c).trim().toLowerCase() === nomeCabecalho.toLowerCase()
+  );
+  if (col === -1) return;
+  const endereco = XLSX.utils.encode_cell({ r: linhaZeroBased, c: col });
+  if (valor === "" || valor === null || valor === undefined) {
+    delete aba[endereco];
+    return;
+  }
+  aba[endereco] = { t: tipo, v: valor };
+}
+</script>
+</body>
+</html>
