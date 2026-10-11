@@ -257,6 +257,56 @@
     margin: 12px 0 6px;
     text-transform: uppercase;
   }
+
+  /* ===== LISTA DE REVISÃO ===== */
+  .item-revisao {
+    background: white;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    cursor: pointer;
+    border-left: 4px solid #28a745;
+    transition: transform 0.1s;
+  }
+  .item-revisao:active {
+    transform: scale(0.98);
+    background: #f0f7ff;
+  }
+  .item-revisao.novo {
+    border-left-color: #17a2b8;
+  }
+  .item-revisao .titulo-rev {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1a1a1a;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+  .item-revisao .detalhe-rev {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+  .item-revisao .contagem-rev {
+    font-size: 18px;
+    font-weight: 700;
+    color: #28a745;
+    margin-top: 6px;
+  }
+  .item-revisao .contagem-rev .rotulo-cont {
+    font-size: 12px;
+    color: #888;
+    font-weight: 500;
+    margin-right: 4px;
+  }
+  .item-revisao .dica-editar {
+    font-size: 12px;
+    color: #6f42c1;
+    font-weight: 600;
+    margin-top: 6px;
+    font-style: italic;
+  }
 </style>
 </head>
 <body>
@@ -332,7 +382,7 @@
       <div id="campos-contagem"></div>
 
       <button class="sucesso" onclick="salvarItem()">Salvar e próximo →</button>
-      <button class="secundario" onclick="pularItem()">Pular</button>
+      <button class="secundario" onclick="voltarItem()">◀ Voltar</button>
       <button class="adicionar" onclick="entrarModoNovo()">
         ➕ Adicionar item com mesmo material (outro lote/validade)
       </button>
@@ -425,6 +475,23 @@
       Nova contagem
     </button>
   </div>
+</div>
+
+<!-- TELA 4: REVISÃO -->
+<div id="tela-revisao" class="tela oculto">
+  <h1>📋 Itens contados</h1>
+  <p style="color:#666; font-size:14px; margin-top:0;">
+    Toque em qualquer item para voltar e corrigir a contagem.
+  </p>
+
+  <div id="lista-revisao"></div>
+
+  <button class="secundario" onclick="fecharRevisao()">
+    ← Voltar à contagem
+  </button>
+  <button class="sucesso" onclick="finalizar()">
+    Finalizar e gerar planilha
+  </button>
 </div>
 
 <script>
@@ -579,6 +646,10 @@ function itemCompleto(item) {
   return true;
 }
 
+function itemTemAlgumaContagem(item) {
+  return colunasContagem.some(cc => item.contagens[cc.nome] !== null);
+}
+
 function formatarData(valor) {
   if (valor === "" || valor === null || valor === undefined) return "-";
   if (typeof valor === "string") {
@@ -666,7 +737,7 @@ function renderizarItem() {
   document.getElementById('bloco-novo').classList.add('oculto');
 
   const item = itens[indiceAtual];
-  if (!item) { finalizar(); return; }
+  if (!item) { abrirRevisao(); return; }
 
   const badge = item.novo ? ' <span class="badge-novo">NOVO</span>' : '';
   document.getElementById('item-material').innerHTML =
@@ -691,11 +762,8 @@ function atualizarProgresso() {
   let posicaoTexto;
   if (emModoNovo) {
     posicaoTexto = "Adicionando novo lote/validade";
-  } else if (itemAtual && itemAtual.novo) {
-    posicaoTexto = `Item adicionado (fora da contagem)`;
   } else {
-    const posOriginal = itensOriginais.indexOf(itemAtual);
-    posicaoTexto = `Item <strong>${posOriginal + 1}</strong> de <strong>${totalOriginais}</strong>`;
+    posicaoTexto = `Item <strong>${indiceAtual + 1}</strong> de <strong>${itens.length}</strong>`;
   }
 
   document.getElementById('contador-topo').innerHTML = posicaoTexto;
@@ -757,22 +825,96 @@ function salvarItem() {
   proximoItem();
 }
 
-// ============ PULAR ITEM ============
-function pularItem() {
-  itens[indiceAtual].pulado = true;
-  proximoItem();
+// ============ VOLTAR ITEM ============
+function voltarItem() {
+  if (indiceAtual > 0) {
+    indiceAtual--;
+    renderizarItem();
+  } else {
+    alert("Você já está no primeiro item.");
+  }
 }
 
 // ============ PRÓXIMO ITEM ============
+// Quando todos os itens estão completos, abre a tela de revisão automaticamente.
 function proximoItem() {
-  for (let i = 0; i < itensOriginais.length; i++) {
-    if (!itemCompleto(itensOriginais[i])) {
-      indiceAtual = itens.indexOf(itensOriginais[i]);
+  for (let i = indiceAtual + 1; i < itens.length; i++) {
+    if (!itemCompleto(itens[i])) {
+      indiceAtual = i;
       renderizarItem();
       return;
     }
   }
-  finalizar();
+  for (let i = 0; i < indiceAtual; i++) {
+    if (!itemCompleto(itens[i])) {
+      indiceAtual = i;
+      renderizarItem();
+      return;
+    }
+  }
+  // Não há mais pendentes → abre a tela de revisão
+  abrirRevisao();
+}
+
+// ============ ABRIR REVISÃO ============
+function abrirRevisao() {
+  document.getElementById('tela-contagem').classList.add('oculto');
+  document.getElementById('tela-revisao').classList.remove('oculto');
+  renderizarRevisao();
+}
+
+function fecharRevisao() {
+  document.getElementById('tela-revisao').classList.add('oculto');
+  document.getElementById('tela-contagem').classList.remove('oculto');
+  renderizarItem();
+}
+
+function renderizarRevisao() {
+  const lista = document.getElementById('lista-revisao');
+  lista.innerHTML = "";
+
+  const contados = itens.filter(itemTemAlgumaContagem);
+
+  if (contados.length === 0) {
+    lista.innerHTML = "<div style='padding:20px; color:#999; text-align:center;'>" +
+      "Nenhum item foi contado ainda.</div>";
+    return;
+  }
+
+  contados.forEach(item => {
+    const idx = itens.indexOf(item);
+
+    const div = document.createElement('div');
+    div.className = 'item-revisao' + (item.novo ? ' novo' : '');
+
+    const badge = item.novo ? ' <span class="badge-novo">NOVO</span>' : '';
+
+    const detalhe = [
+      item.codigo ? `Cód: ${item.codigo}` : '',
+      item.lote ? `Lote: ${item.lote}` : '',
+      item.enderecamento ? `End: ${item.enderecamento}` : ''
+    ].filter(Boolean).join(' · ');
+
+    const contStr = colunasContagem.map(cc => {
+      const v = item.contagens[cc.nome];
+      if (v === null || v === undefined) return null;
+      return `<span class="rotulo-cont">${cc.nome}:</span>${v}`;
+    }).filter(Boolean).join(' &nbsp;|&nbsp; ');
+
+    div.innerHTML = `
+      <div class="titulo-rev">${item.material || '(sem material)'}${badge}</div>
+      <div class="detalhe-rev">${detalhe || '—'}</div>
+      <div class="contagem-rev">${contStr || '—'}</div>
+      <div class="dica-editar">Toque para editar</div>
+    `;
+
+    div.addEventListener('click', () => {
+      indiceAtual = idx;
+      fecharRevisao();
+    });
+
+    lista.appendChild(div);
+  });
 }
 
 // ============ MODO NOVO ============
@@ -858,7 +1000,8 @@ function salvarNovoItem() {
   itensNovos.push(novoItem);
   itens.push(novoItem);
 
-  alert("Item novo adicionado com sucesso!");
+  // Vai direto para o item novo, para conferir
+  indiceAtual = itens.length - 1;
   renderizarItem();
 }
 
@@ -874,7 +1017,7 @@ function finalizar() {
 
   const listaOrig = document.getElementById('lista-concluidos');
   listaOrig.innerHTML = itensOriginais
-    .filter(i => Object.values(i.contagens).some(v => v !== null))
+    .filter(i => itemTemAlgumaContagem(i))
     .map(i => {
       const ident = i.codigo || i.material;
       const loteInfo = i.lote ? ` (Lote ${i.lote})` : '';
@@ -900,6 +1043,7 @@ function finalizar() {
     .join("") || "<div><em>Nenhum item foi adicionado.</em></div>";
 
   document.getElementById('tela-contagem').classList.add('oculto');
+  document.getElementById('tela-revisao').classList.add('oculto');
   document.getElementById('tela-final').classList.remove('oculto');
 }
 
